@@ -1,15 +1,48 @@
+
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+
+# simple kaggle preprocessing as per updated instructions
 
 def preprocess_kaggle_data(df):
+    """Minimal cleaning: drop duplicates, sort by time, reset index."""
+    # remove duplicates if any
+    df = df.drop_duplicates()
 
-    df["Date"] = pd.to_datetime(df["Date"])
+    # order chronologically (important for time-series)
+    if "Time" in df.columns:
+        df = df.sort_values("Time")
 
-    df["Amount"] = df["Amount"].astype(float)
+    # reset index after sorting/dropping
+    df = df.reset_index(drop=True)
 
-    daily_spend = df.groupby("Date")["Amount"].sum().reset_index()
+    return df
 
-    daily_spend = daily_spend.sort_values("Date")
 
-    print(daily_spend.head())
+def preprocess_transactions(df):
+    """
+    Preprocess transaction data with encoding and feature extraction.
+    
+    Args:
+        df: DataFrame with transaction data
+        
+    Returns:
+        Preprocessed DataFrame with encoded features and extracted temporal features
+    """
+    df = df.copy()
 
-    return daily_spend
+    # Encode category
+    cat_encoder = LabelEncoder()
+    df['category_encoded'] = cat_encoder.fit_transform(df['category'].astype(str))
+
+    # Encode type (income/expense)
+    type_encoder = LabelEncoder()
+    df['type_encoded'] = type_encoder.fit_transform(df['type'])
+
+    # Convert date to datetime
+    df['date'] = pd.to_datetime(df['date'])
+
+    # Extract day of week
+    df['day_of_week'] = df['date'].dt.dayofweek
+
+    return df

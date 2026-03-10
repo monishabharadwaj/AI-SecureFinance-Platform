@@ -3,18 +3,25 @@ import torch.nn as nn
 
 
 class SpendingLSTM(nn.Module):
+    """
+    LSTM model for spending amount time-series prediction.
+    
+    Input:
+    - Univariate or multivariate time-series data
+    - input_size: Number of features per timestep
+    """
 
-    def __init__(self):
+    def __init__(self, input_size=1, hidden_size=64, num_layers=2):
         super().__init__()
 
         self.lstm = nn.LSTM(
-            input_size=1,
-            hidden_size=64,
-            num_layers=2,
+            input_size,
+            hidden_size,
+            num_layers,
             batch_first=True
         )
 
-        self.fc = nn.Linear(64,1)
+        self.fc = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
 

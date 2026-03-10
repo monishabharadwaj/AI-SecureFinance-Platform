@@ -17,29 +17,50 @@ def format_indian_rupees(amount):
         return f"₹{formatted}"
 
 def load_model():
-
-    model = SpendingLSTM()
-    model.load_state_dict(torch.load("spending_lstm_model.pth"))
+    """Load the trained univariate LSTM model (Amount time-series)"""
+    model = SpendingLSTM(input_size=1, hidden_size=64, num_layers=2)
+    model.load_state_dict(torch.load("multivariate_lstm_model.pth"))
     model.eval()
-
     return model
 
 
 def predict_next(sequence):
-
+    """
+    Predict next spending amount from a univariate sequence.
+    
+    Args:
+        sequence: List or array of spending amounts
+    
+    Returns:
+        Formatted prediction in Indian Rupees
+    """
     model = load_model()
 
-    # Load the scaler
-    scaler = joblib.load("scaler.save")
+    # Load the feature scaler
+    scaler = joblib.load("feature_scaler.pkl")
 
-    seq = torch.tensor(sequence).float().unsqueeze(0).unsqueeze(-1)
+    # Convert to numpy array
+    sequence = np.array(sequence).reshape(-1, 1)
 
-    prediction = model(seq)
+    # Normalize the sequence using the same scaler used during training
+    sequence_scaled = scaler.transform(sequence)
 
-    # Inverse transform to get actual money values
-    prediction = scaler.inverse_transform([[prediction.item()]])
+    # Convert to PyTorch tensor: shape (1, seq_length, 1)
+    tensor = torch.tensor(sequence_scaled).float().unsqueeze(0)
+
+    # Make prediction
+    with torch.no_grad():
+        pred = model(tensor)
+
+    # Get the predicted scaled amount
+    pred_scaled = pred.item()
+
+    # Inverse transform to get actual amount
+    # Create a dummy row with the prediction
+    dummy_row = np.array([[pred_scaled]])
+    pred_actual = scaler.inverse_transform(dummy_row)[0, 0]
 
     # Format as Indian Rupees
-    formatted_prediction = format_indian_rupees(prediction[0][0])
+    formatted_prediction = format_indian_rupees(pred_actual)
 
     return formatted_prediction
