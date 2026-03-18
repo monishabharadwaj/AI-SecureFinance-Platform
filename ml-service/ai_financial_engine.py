@@ -112,7 +112,12 @@ class FinancialAIEngine:
 
         change = ((last_week - prev_week) / prev_week) * 100
 
-        if change > 10:
+        if abs(change) > 200:
+            insights.append(
+                "Your spending this week is significantly higher than last week."
+            )
+
+        elif change > 10:
             insights.append(
                 f"Your spending this week is about {change:.0f}% higher than last week."
             )
@@ -124,7 +129,7 @@ class FinancialAIEngine:
 
         else:
             insights.append(
-                "Your spending this week is fairly similar to last week."
+                "Your spending this week looks fairly similar to last week."
             )
 
         return insights

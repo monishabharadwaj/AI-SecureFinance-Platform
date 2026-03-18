@@ -35,8 +35,50 @@ const refreshToken = (req, res) => {
   });
 };
 
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const result = await authService.forgotPassword(email);
+    res.json(result);
+  } catch (err) {
+    if (err.message === 'User not found') {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Token and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    const result = await authService.resetPassword(token, newPassword);
+    res.json(result);
+  } catch (err) {
+    if (err.message === 'Invalid token') {
+      return res.status(400).json({ message: 'Invalid token' });
+    }
+    next(err);
+  }
+};
+
 module.exports = {
   register,
   login,
-  refreshToken
+  refreshToken,
+  forgotPassword,
+  resetPassword
 };

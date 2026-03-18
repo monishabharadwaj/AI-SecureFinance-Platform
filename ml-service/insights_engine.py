@@ -171,21 +171,22 @@ class InsightsEngine:
             return insights
 
         change = ((last_week - prev_week) / prev_week) * 100
+        if abs(change) > 200:
+            insights.append(
+                "Your spending this week is significantly higher than last week."
+            )
 
-        if change > 10:
-
+        elif change > 10:
             insights.append(
                 f"Your spending this week is about {change:.0f}% higher than last week."
             )
 
         elif change < -10:
-
             insights.append(
                 f"Your spending this week is about {abs(change):.0f}% lower than last week."
             )
 
         else:
-
             insights.append(
                 "Your spending this week looks fairly similar to last week."
             )

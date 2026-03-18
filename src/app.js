@@ -6,6 +6,7 @@ const verifyToken = require('./middleware/jwtMiddleware');
 const errorHandler = require('./middleware/errorMiddleware');
 const transactionRoutes = require('./finance/transactions/transactionRoutes');
 const analyticsRoutes = require('./analytics/analyticsRoutes');
+const aiRoutes = require('./ai/aiRoutes');
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Test protected route
 app.get('/api/protected', verifyToken, (req, res) => {

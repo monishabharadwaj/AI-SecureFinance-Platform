@@ -45,40 +45,36 @@ _CACHED_SCALER = None
 def predict_next(sequence):
     """
     Predict next spending amount from a univariate sequence.
-    
+
     Args:
         sequence: List or array of spending amounts
-    
+
     Returns:
-        Formatted prediction in Indian Rupees
+        float: predicted spending amount
     """
+
     model = load_model()
 
-    # Load cached scaler (populated by load_model)
+    # Load cached scaler
     scaler = _CACHED_SCALER
 
     # Convert to numpy array
     sequence = np.array(sequence).reshape(-1, 1)
 
-    # Normalize the sequence using the same scaler used during training
+    # Normalize
     sequence_scaled = scaler.transform(sequence)
 
-    # Convert to PyTorch tensor: shape (1, seq_length, 1)
+    # Convert to tensor
     tensor = torch.tensor(sequence_scaled).float().unsqueeze(0)
 
-    # Make prediction
+    # Predict
     with torch.no_grad():
         pred = model(tensor)
 
-    # Get the predicted scaled amount
     pred_scaled = pred.item()
 
-    # Inverse transform to get actual amount
-    # Create a dummy row with the prediction
+    # Inverse transform
     dummy_row = np.array([[pred_scaled]])
     pred_actual = scaler.inverse_transform(dummy_row)[0, 0]
 
-    # Format as Indian Rupees
-    formatted_prediction = format_indian_rupees(pred_actual)
-
-    return formatted_prediction
+    return float(pred_actual)

@@ -17,7 +17,43 @@ const createUser = async (name, email, passwordHash) => {
   return result.insertId;
 };
 
+const setResetToken = async (email, resetToken) => {
+  const [result] = await db.execute(
+    'UPDATE users SET reset_token = ? WHERE email = ?',
+    [resetToken, email]
+  );
+  return result.affectedRows > 0;
+};
+
+const findByResetToken = async (resetToken) => {
+  const [rows] = await db.execute(
+    'SELECT * FROM users WHERE reset_token = ?',
+    [resetToken]
+  );
+  return rows[0];
+};
+
+const updatePassword = async (userId, hashedPassword) => {
+  const [result] = await db.execute(
+    'UPDATE users SET password = ?, reset_token = NULL WHERE id = ?',
+    [hashedPassword, userId]
+  );
+  return result.affectedRows > 0;
+};
+
+const clearResetToken = async (resetToken) => {
+  const [result] = await db.execute(
+    'UPDATE users SET reset_token = NULL WHERE reset_token = ?',
+    [resetToken]
+  );
+  return result.affectedRows > 0;
+};
+
 module.exports = {
   findByEmail,
-  createUser
+  createUser,
+  setResetToken,
+  findByResetToken,
+  updatePassword,
+  clearResetToken
 };

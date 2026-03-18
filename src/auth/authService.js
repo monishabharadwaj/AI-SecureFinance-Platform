@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const userModel = require('../models/userModel');
 const { generateAccessToken, generateRefreshToken } = require('../utils/tokenUtils');
 
@@ -25,7 +26,32 @@ const login = async (email, password) => {
   return { accessToken, refreshToken };
 };
 
+const forgotPassword = async (email) => {
+  const user = await userModel.findByEmail(email);
+  if (!user) throw new Error('User not found');
+
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  await userModel.setResetToken(email, resetToken);
+
+  return { 
+    message: 'Reset token generated',
+    resetToken 
+  };
+};
+
+const resetPassword = async (token, newPassword) => {
+  const user = await userModel.findByResetToken(token);
+  if (!user) throw new Error('Invalid token');
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  await userModel.updatePassword(user.id, hashedPassword);
+
+  return { message: 'Password reset successful' };
+};
+
 module.exports = {
   register,
-  login
+  login,
+  forgotPassword,
+  resetPassword
 };

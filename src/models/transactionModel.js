@@ -1,11 +1,21 @@
 const db = require('../config/db');
 
-const createTransaction = async (userId, type, amount, category, description, date) => {
+const createTransaction = async (userId, type, amount, category, description, date, aiResult) => {
   const [result] = await db.execute(
     `INSERT INTO transactions 
-    (user_id, type, amount, category, description, date) 
-    VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, type, amount, category, description, date]
+    (user_id, type, amount, category, description, date, ai_risk_level, anomaly_score, ai_explanation) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId, 
+      type, 
+      amount, 
+      category, 
+      description, 
+      date,
+      aiResult?.risk_level || null,
+      aiResult?.anomaly_score || null,
+      aiResult?.explanation || null
+    ]
   );
 
   return result.insertId;
@@ -27,8 +37,18 @@ const deleteTransaction = async (transactionId, userId) => {
   );
 };
 
+const updateTransactionWithAI = async (transactionId, aiRiskLevel, anomalyScore, aiExplanation) => {
+  await db.execute(
+    `UPDATE transactions 
+    SET ai_risk_level = ?, anomaly_score = ?, ai_explanation = ? 
+    WHERE id = ?`,
+    [aiRiskLevel, anomalyScore, aiExplanation, transactionId]
+  );
+};
+
 module.exports = {
   createTransaction,
   getTransactionsByUser,
-  deleteTransaction
+  deleteTransaction,
+  updateTransactionWithAI
 };
