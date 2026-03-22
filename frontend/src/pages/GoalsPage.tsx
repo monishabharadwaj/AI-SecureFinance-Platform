@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Plus, Trophy, Clock } from "lucide-react";
+import { CheckCircle2, Plus, Trophy, Clock, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { differenceInDays } from "date-fns";
 import { safeToLocaleString } from "@/utils/format";
@@ -17,7 +17,7 @@ const goalIcons: Record<string, string> = {
 };
 
 export default function GoalsPage() {
-  const { goals, addGoal, addGoalFunds, completeGoal } = useFinanceStore();
+  const { goals, addGoal, addGoalFunds, completeGoal, deleteGoal } = useFinanceStore();
   const [open, setOpen] = useState(false);
   const [fundOpen, setFundOpen] = useState<string | null>(null);
   const [fundAmount, setFundAmount] = useState("");
@@ -28,21 +28,24 @@ export default function GoalsPage() {
   const totalCurrent = goals.reduce((s, g) => s + g.currentAmount, 0);
   const completedCount = goals.filter(g => g.is_completed || g.currentAmount >= g.targetAmount).length;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!form.title || !form.targetAmount || !form.deadline) return;
-    addGoal({
-      id: Date.now().toString(),
-      title: form.title,
-      targetAmount: Number(form.targetAmount),
-      currentAmount: Number(form.currentAmount) || 0,
-      deadline: form.deadline,
-      category: form.category,
-      icon: goalIcons[form.category] || '🎯',
-      is_completed: false,
-    });
-    toast({ title: "Goal created! 🎯" });
-    setForm({ title: '', targetAmount: '', currentAmount: '0', deadline: '', category: 'general' });
-    setOpen(false);
+    try {
+      await addGoal({
+        title: form.title,
+        targetAmount: Number(form.targetAmount),
+        currentAmount: Number(form.currentAmount) || 0,
+        deadline: form.deadline,
+        category: form.category,
+        icon: goalIcons[form.category] || '🎯',
+        is_completed: false,
+      });
+      toast({ title: "Goal created! 🎯" });
+      setForm({ title: '', targetAmount: '', currentAmount: '0', deadline: '', category: 'general' });
+      setOpen(false);
+    } catch (err: any) {
+      toast({ title: "Failed to create goal", description: err.message || String(err), variant: "destructive" });
+    }
   };
 
   const handleAddFunds = (goalId: string) => {
@@ -118,7 +121,7 @@ export default function GoalsPage() {
               <Card className={`glass-card p-5 hover:shadow-md transition-shadow ${complete ? "ring-2 ring-success/30" : ""}`}>
                 <div className="flex items-center gap-3 mb-4">
                   <span className="text-3xl">{g.icon}</span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-semibold truncate">{g.title}</h3>
                     {complete ? (
                       <span className="text-xs text-success font-medium flex items-center gap-1"><Trophy className="h-3 w-3" /> Completed! 🎉</span>
@@ -126,6 +129,9 @@ export default function GoalsPage() {
                       <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> {daysLeft} days left</span>
                     )}
                   </div>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8 ml-auto" onClick={() => { deleteGoal(g.id); toast({ title: "Goal deleted! 🗑️" }) }}>
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
                 <div className="flex items-end justify-between mb-2">
                   <span className="text-2xl font-display font-bold">{pct}%</span>

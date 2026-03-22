@@ -1,22 +1,15 @@
 const db = require('../config/db');
 
 const budgetModel = {
-  // Create a new budget
   async createBudget(userId, category, amount, period = 'monthly') {
     const query = `
-      INSERT INTO budgets (user_id, category, amount, period, created_at, updated_at)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      ON CONFLICT(user_id, category) 
-      DO UPDATE SET 
-        amount = excluded.amount,
-        period = excluded.period,
-        updated_at = CURRENT_TIMESTAMP
-      RETURNING *
+      INSERT INTO budgets (user_id, category, amount, period)
+      VALUES (?, ?, ?, ?)
     `;
     
     try {
-      const [result] = await db.execute(query, [userId, category, amount, period]);
-      return result;
+      await db.execute(query, [userId, category, amount, period]);
+      return { user_id: userId, category, amount, period };
     } catch (error) {
       console.error('Error creating budget:', error);
       throw error;
@@ -56,18 +49,16 @@ const budgetModel = {
     }
   },
 
-  // Update budget
   async updateBudget(userId, category, amount, period) {
     const query = `
       UPDATE budgets 
       SET amount = ?, period = ?, updated_at = CURRENT_TIMESTAMP
       WHERE user_id = ? AND category = ?
-      RETURNING *
     `;
     
     try {
       const [result] = await db.execute(query, [amount, period, userId, category]);
-      return result.length > 0 ? result[0] : null;
+      return result.affectedRows > 0 ? { user_id: userId, category, amount, period } : null;
     } catch (error) {
       console.error('Error updating budget:', error);
       throw error;

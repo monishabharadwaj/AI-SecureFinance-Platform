@@ -292,7 +292,9 @@ function InsightCard({
       className={`flex items-start gap-3 p-3 rounded-lg border ${card}`}
     >
       {icon}
-      <p className="text-sm leading-relaxed">{insight.text}</p>
+      <div className="text-sm leading-relaxed whitespace-pre-wrap mt-[-2px]">
+        {insight.text.replace(/\*\*/g, '')}
+      </div>
     </motion.div>
   );
 }

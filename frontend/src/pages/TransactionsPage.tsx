@@ -329,7 +329,12 @@ export default function TransactionsPage() {
       {/* List */}
       <Card className="glass-card overflow-hidden">
         <div className="divide-y">
-          {filtered.map((t, i) => (
+          {filtered.map((t, i) => {
+            const isPositive = t.type === "income" || (t.type as string) === "credit";
+            const showHighRisk = !isPositive && t.ai_risk_level?.toLowerCase() === "high";
+            const showMediumRisk = !isPositive && t.ai_risk_level?.toLowerCase() === "medium";
+            
+            return (
             <motion.div
               key={t.id}
               initial={{ opacity: 0 }}
@@ -337,7 +342,7 @@ export default function TransactionsPage() {
               transition={{ delay: i * 0.03 }}
             >
               <div
-                className={`flex items-center justify-between px-5 py-3.5 hover:bg-muted/50 transition-colors ${t.ai_risk_level?.toLowerCase() === "high" ? "bg-destructive/5 border-l-2 border-l-destructive" : t.ai_risk_level?.toLowerCase() === "medium" ? "bg-warning/5 border-l-2 border-l-warning" : ""}`}
+                className={`flex items-center justify-between px-5 py-3.5 hover:bg-muted/50 transition-colors ${showHighRisk ? "bg-destructive/5 border-l-2 border-l-destructive" : showMediumRisk ? "bg-warning/5 border-l-2 border-l-warning" : ""}`}
               >
                 <div className="flex items-center gap-4 min-w-0">
                   <span className="text-xs text-muted-foreground w-16 shrink-0">
@@ -349,16 +354,18 @@ export default function TransactionsPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <RiskBadge
-                    level={t.ai_risk_level}
-                    score={t.anomaly_score}
-                    explanation={t.ai_explanation}
-                    compact
-                  />
+                  {!isPositive && (
+                    <RiskBadge
+                      level={t.ai_risk_level}
+                      score={t.anomaly_score}
+                      explanation={t.ai_explanation}
+                      compact
+                    />
+                  )}
                   <span
-                    className={`text-sm font-semibold tabular-nums ${t.type === "income" ? "text-success" : "text-destructive"}`}
+                    className={`text-sm font-semibold tabular-nums ${isPositive ? "text-success" : "text-destructive"}`}
                   >
-                    {t.type === "income" ? "+" : "-"}₹
+                    {isPositive ? "+" : "-"}₹
                     {safeToLocaleString(t.amount)}
                   </span>
                   <Button
@@ -372,7 +379,7 @@ export default function TransactionsPage() {
                   </Button>
                 </div>
               </div>
-              {t.ai_risk_level?.toLowerCase() === "high" &&
+              {showHighRisk &&
                 t.ai_explanation && (
                   <div className="px-5 pb-3 flex items-center gap-2 text-xs text-destructive">
                     <AlertTriangle className="h-3 w-3" />
@@ -380,7 +387,7 @@ export default function TransactionsPage() {
                   </div>
                 )}
             </motion.div>
-          ))}
+          )})}
           {filtered.length === 0 && !isLoading && (
             <div className="p-8 text-center text-muted-foreground">
               {error ? `Error: ${error}` : "No transactions found"}

@@ -57,7 +57,16 @@ const getAIDashboard = async (userId) => {
 
   try {
     if (sequence.length > 0) {
-      prediction = await aiPredictor.predictSpending(sequence);
+      const mlResponse = await aiPredictor.predictSpending(sequence);
+      
+      // Transform ML service response to expected format
+      if (mlResponse && mlResponse.predicted_next_spending !== undefined) {
+        prediction = {
+          amount: mlResponse.predicted_next_spending,
+          date: 'next month',
+          confidence: 0.75 // Default confidence when ML service responds
+        };
+      }
     }
   } catch (err) {
     console.error("Prediction failed:", {
@@ -66,6 +75,7 @@ const getAIDashboard = async (userId) => {
       statusCode: err.response?.status,
       details: err.response?.data
     });
+    // Don't set prediction to null, leave it as null to hide the card
   }
 
   // Get recent transactions

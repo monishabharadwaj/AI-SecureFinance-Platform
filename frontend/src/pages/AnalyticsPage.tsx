@@ -60,46 +60,48 @@ function deriveHealthScore(data: AIDashboardData) {
   const income = data.summary?.total_income ?? 0;
   const expense = data.summary?.total_expense ?? 0;
   const balance = data.summary?.balance ?? income - expense;
+  
   const savingsRate = income > 0 ? Math.round((balance / income) * 100) : 0;
-  const overallScore = Math.min(
-    100,
-    Math.max(
-      0,
-      savingsRate > 20 ? 85 : savingsRate > 10 ? 70 : savingsRate > 0 ? 50 : 25,
-    ),
-  );
+  const expenseRatio = income > 0 ? Math.round((expense / income) * 100) : 0;
+
+  // Check categories for debt and investments
+  const expensesCat = (data.categories?.expenses as Record<string, number>) || {};
+  
+  const debtExpense = 
+    (expensesCat.loan || 0) + 
+    (expensesCat.emi || 0) + 
+    (expensesCat.debt || 0) + 
+    (expensesCat.credit || 0);
+    
+  const debtRatio = income > 0 ? Math.round((debtExpense / income) * 100) : 0;
+  const debtManagement = income > 0 ? (debtRatio > 0 ? Math.max(0, 100 - (debtRatio * 2)) : 100) : 0;
+
+  const investment = expensesCat.investment || 0;
+  const investmentRatio = expense > 0 ? Math.round((investment / expense) * 100) : 0;
+  // Scaled such that 33% of expenses going to investment gives a 100 score
+  const investmentDiversity = income > 0 ? Math.min(100, investmentRatio * 3) : 0;
+
+  let overallScore = 0;
+  if (income > 0) {
+    const savingsScore = savingsRate > 20 ? 85 : savingsRate > 10 ? 70 : savingsRate > 0 ? 50 : 25;
+    // Blend savings score with debt and investment health
+    overallScore = Math.min(100, Math.max(0, Math.round((savingsScore * 0.6) + (debtManagement * 0.2) + (investmentDiversity * 0.2))));
+  }
+
   return {
     overallScore,
     savingsRate,
-    budgetAdherence: 75,
-    emergencyFund: 60,
-    debtManagement: 80,
-    investmentDiversity: 65,
+    expenseRatio,
+    debtManagement,
+    investmentDiversity,
   };
 }
 
 const HEALTH_CATS = [
   { label: "Savings Rate", key: "savingsRate" as const, bar: "bg-green-500" },
-  {
-    label: "Budget Adherence",
-    key: "budgetAdherence" as const,
-    bar: "bg-yellow-500",
-  },
-  {
-    label: "Emergency Fund",
-    key: "emergencyFund" as const,
-    bar: "bg-blue-500",
-  },
-  {
-    label: "Debt Management",
-    key: "debtManagement" as const,
-    bar: "bg-green-500",
-  },
-  {
-    label: "Investment Diversity",
-    key: "investmentDiversity" as const,
-    bar: "bg-purple-500",
-  },
+  { label: "Expense Ratio", key: "expenseRatio" as const, bar: "bg-red-500" },
+  { label: "Debt Management", key: "debtManagement" as const, bar: "bg-blue-500" },
+  { label: "Investment Score", key: "investmentDiversity" as const, bar: "bg-purple-500" },
 ];
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -181,6 +183,10 @@ export default function AnalyticsPage() {
     date: string;
     reason: string;
   }> = (dashboardData.ai_flagged_transactions ?? [])
+    .filter((f: any) => {
+      const tx = f?.transaction ?? f;
+      return tx?.type !== 'income' && tx?.type !== 'credit';
+    })
     .slice(0, 5)
     .map((f: any) => {
       const tx = f?.transaction ?? f;

@@ -2,15 +2,15 @@ const db = require('../config/db');
 
 const financialGoalsModel = {
   // Create a new financial goal
-  async createGoal(userId, title, targetAmount, currentAmount = 0, deadline = null, category = 'general') {
+  async createGoal(userId, title, targetAmount, currentAmount = 0, deadline = null, category = 'general', icon = '🎯') {
     const query = `
       INSERT INTO financial_goals 
-      (user_id, title, target_amount, current_amount, deadline, category, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      (user_id, title, target_amount, current_amount, deadline, category, icon, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
     
     try {
-      const [result] = await db.execute(query, [userId, title, targetAmount, currentAmount, deadline, category]);
+      const [result] = await db.execute(query, [userId, title, targetAmount, currentAmount, deadline, category, icon]);
       return result.insertId;
     } catch (error) {
       console.error('Error creating financial goal:', error);
@@ -21,11 +21,12 @@ const financialGoalsModel = {
   // Get all goals for a user
   async getUserGoals(userId) {
     const query = `
-      SELECT *, 
+      SELECT id, user_id, title, target_amount as targetAmount, current_amount as currentAmount, 
+             deadline, category, icon, is_completed, created_at, updated_at,
              (current_amount / target_amount * 100) as progress_percentage,
              DATEDIFF(deadline, CURRENT_DATE) as days_remaining
       FROM financial_goals 
-      WHERE user_id = 
+      WHERE user_id = ?
         AND is_completed = false
       ORDER BY deadline ASC
     `;
@@ -114,7 +115,8 @@ const financialGoalsModel = {
   // Get goals nearing deadline
   async getGoalsNearingDeadline(userId, daysThreshold = 30) {
     const query = `
-      SELECT *, 
+      SELECT id, user_id, title, target_amount as targetAmount, current_amount as currentAmount, 
+             deadline, category, icon, is_completed, created_at, updated_at,
              (current_amount / target_amount * 100) as progress_percentage,
              DATEDIFF(deadline, CURRENT_DATE) as days_remaining
       FROM financial_goals 

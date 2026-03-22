@@ -19,11 +19,12 @@ interface FinanceStore {
   addBudget: (b: Omit<Budget, 'id'>) => Promise<void>;
   deleteBudget: (id: string) => Promise<void>;
   addGoalFunds: (goalId: string, amount: number) => void;
-  addGoal: (g: Goal) => void;
+  addGoal: (g: Omit<Goal, 'id'>) => Promise<void>;
   completeGoal: (id: string) => void;
   addTrip: (t: Trip) => void;
   updateTripStatus: (id: string, status: Trip['status']) => void;
   deleteTrip: (id: string) => void;
+  deleteGoal: (id: string) => Promise<void>;
 }
 
 export const useFinanceStore = create<FinanceStore>((set, get) => ({
@@ -142,11 +143,34 @@ export const useFinanceStore = create<FinanceStore>((set, get) => ({
         g.id === goalId ? { ...g, currentAmount: Math.min(g.currentAmount + amount, g.targetAmount) } : g
       ),
     })),
-  addGoal: (g) => set((s) => ({ goals: [...s.goals, g] })),
+  addGoal: async (g: Omit<Goal, 'id'>) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.createGoal(g);
+      await get().fetchGoals();
+      set({ isLoading: false });
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
   completeGoal: (id) =>
     set((s) => ({
       goals: s.goals.map((g) => (g.id === id ? { ...g, is_completed: true, currentAmount: g.targetAmount } : g)),
     })),
+  deleteGoal: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await apiClient.deleteGoal(id);
+      set((state) => ({ 
+        goals: state.goals.filter(g => g.id !== id),
+        isLoading: false 
+      }));
+    } catch (error: any) {
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
 
   addTrip: (t) => set((s) => ({ trips: [...s.trips, t] })),
   updateTripStatus: (id, status) =>

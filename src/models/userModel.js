@@ -8,6 +8,14 @@ const findByEmail = async (email) => {
   return rows[0];
 };
 
+const findById = async (id) => {
+  const [rows] = await db.execute(
+    'SELECT * FROM users WHERE id = ?',
+    [id]
+  );
+  return rows[0];
+};
+
 const createUser = async (name, email, passwordHash) => {
   const [result] = await db.execute(
     'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
@@ -51,6 +59,7 @@ const clearResetToken = async (resetToken) => {
 
 module.exports = {
   findByEmail,
+  findById,
   createUser,
   setResetToken,
   findByResetToken,

@@ -31,7 +31,9 @@ function extractErrorMessage(error: unknown): string {
     // 1. Server returned a JSON body with a message
     const serverMsg =
       axiosErr.response?.data?.message || axiosErr.response?.data?.error;
-    if (serverMsg) return String(serverMsg);
+    if (serverMsg) {
+      return typeof serverMsg === "object" ? JSON.stringify(serverMsg) : String(serverMsg);
+    }
 
     // 2. Network-level failure (no response at all)
     if (axiosErr.code === "ERR_NETWORK" || !axiosErr.response) {
@@ -276,8 +278,8 @@ class ApiClient {
 
   // Goals endpoints
   async getGoals() {
-    const response = await this.api.get<Goal[]>("/ai/savings-goals");
-    return response.data;
+    const response = await this.api.get<{ goals: Goal[] }>("/ai/savings-goals");
+    return response.data.goals || [];
   }
 
   async createGoal(data: Omit<Goal, "id">) {
@@ -288,6 +290,10 @@ class ApiClient {
   async updateGoal(id: string, data: Partial<Goal>) {
     const response = await this.api.put<Goal>(`/ai/savings-goals/${id}`, data);
     return response.data;
+  }
+
+  async deleteGoal(id: string) {
+    await this.api.delete(`/ai/savings-goals/${id}`);
   }
 
   // Trips endpoints

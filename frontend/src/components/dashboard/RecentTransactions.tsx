@@ -102,7 +102,8 @@ export function RecentTransactions({ transactions }: Props) {
         ) : (
           <div className="divide-y divide-border">
             {safe.map((t, index) => {
-              const isHighRisk =
+              const isCredit = t.type === "income" || (t.type as string) === "credit";
+              const isHighRisk = !isCredit &&
                 t.ai_risk_level != null &&
                 String(t.ai_risk_level).toLowerCase() === "high";
 
@@ -141,12 +142,14 @@ export function RecentTransactions({ transactions }: Props) {
                   {/* Right — risk badge + category + amount */}
                   <div className="flex items-center gap-2 shrink-0">
                     {/* Risk badge — only rendered when level is present */}
-                    <RiskBadge
-                      level={t.ai_risk_level}
-                      score={t.anomaly_score}
-                      explanation={t.ai_explanation}
-                      compact
-                    />
+                    {!isCredit && (
+                      <RiskBadge
+                        level={t.ai_risk_level}
+                        score={t.anomaly_score}
+                        explanation={t.ai_explanation}
+                        compact
+                      />
+                    )}
 
                     {/* Category chip — hidden on very small screens */}
                     <span
@@ -160,7 +163,7 @@ export function RecentTransactions({ transactions }: Props) {
 
                     {/* Amount */}
                     <div className="flex items-center gap-1">
-                      {t.type === "income" ? (
+                      {isCredit ? (
                         <TrendingUp className="h-3 w-3 text-green-600 shrink-0" />
                       ) : (
                         <TrendingDown className="h-3 w-3 text-red-500 shrink-0" />
@@ -168,12 +171,12 @@ export function RecentTransactions({ transactions }: Props) {
                       <span
                         className={[
                           "text-sm font-semibold tabular-nums",
-                          t.type === "income"
+                          isCredit
                             ? "text-green-600"
                             : "text-red-500",
                         ].join(" ")}
                       >
-                        {t.type === "income" ? "+" : "−"}₹
+                        {isCredit ? "+" : "−"}₹
                         {safeToLocaleString(
                           typeof t.amount === "number"
                             ? t.amount

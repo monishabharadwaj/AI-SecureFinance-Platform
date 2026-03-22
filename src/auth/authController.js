@@ -2,12 +2,24 @@ const authService = require('./authService');
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const { generateAccessToken } = require('../utils/tokenUtils');
+const userModel = require('../models/userModel');
 
 const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
     const user = await authService.register(name, email, password);
-    res.status(201).json(user);
+    
+    // Generate tokens for new user
+    const tokens = await authService.login(email, password);
+    
+    // Get user info without password
+    const userWithoutPassword = { id: user.id, name: user.name, email: user.email };
+    
+    res.status(201).json({ 
+      accessToken: tokens.accessToken, 
+      refreshToken: tokens.refreshToken,
+      user: userWithoutPassword
+    });
   } catch (err) {
     next(err);
   }
@@ -17,7 +29,16 @@ const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const tokens = await authService.login(email, password);
-    res.json(tokens);
+    
+    // Get user info without password
+    const user = await userModel.findByEmail(email);
+    const { password: _, ...userWithoutPassword } = user;
+    
+    res.json({ 
+      accessToken: tokens.accessToken, 
+      refreshToken: tokens.refreshToken,
+      user: userWithoutPassword
+    });
   } catch (err) {
     next(err);
   }
@@ -75,10 +96,24 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+const getMe = async (req, res, next) => {
+  try {
+    const user = await userModel.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    // Get user info without password
+    const { password: _, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   register,
   login,
   refreshToken,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  getMe
 };

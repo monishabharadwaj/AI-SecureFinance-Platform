@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiClient } from "@/services/api";
+import { useFinanceStore } from "@/stores/financeStore";
 import {
   TrendingUp,
   TrendingDown,
@@ -12,84 +13,50 @@ import {
   AlertTriangle,
   Brain,
   RefreshCw,
-  Lightbulb,
   Activity,
   BarChart3,
-  Wallet,
+  Lightbulb,
+  Wallet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  safeToLocaleString,
-  safeToFixed,
-  formatCurrency,
-} from "@/utils/format";
-import type {
-  AIDashboardData,
-  CategoryEntry,
-  MonthlyEntry,
-  NormalisedSummary,
-} from "@/types/finance";
-import { CategoryDonutChart } from "@/components/charts/CategoryDonutChart";
+import { safeToLocaleString, formatCurrency } from "@/utils/format";
+import type { AIDashboardData, CategoryEntry, MonthlyEntry, NormalisedSummary } from "@/types/finance";
+import { CategoryBarChart } from "@/components/charts/CategoryBarChart";
 import { IncomeExpenseChart } from "@/components/charts/IncomeExpenseChart";
 import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
 import { AnomalyAlerts } from "@/components/dashboard/AnomalyAlerts";
 
-// ─── Normalisation helpers ────────────────────────────────────────────────────
-
-/**
- * Backend returns categories as:
- *   { income: { salary: 50000, freelance: 10000 },
- *     expenses: { food: 3000, transport: 1200 } }
- *
- * We convert the EXPENSES object into a sorted array for the chart.
- */
-function normaliseCategoryData(
-  raw: AIDashboardData["categories"],
-): CategoryEntry[] {
+// Normalisation helpers
+function normaliseCategoryData(raw: AIDashboardData["categories"]): CategoryEntry[] {
   if (!raw || typeof raw !== "object") return [];
-
-  const expenseMap: Record<string, number> =
-    raw.expenses && typeof raw.expenses === "object" ? raw.expenses : {};
-
+  const expenseMap: Record<string, number> = raw.expenses && typeof raw.expenses === "object" ? raw.expenses : {};
   const total = Object.values(expenseMap).reduce((sum, v) => sum + (v || 0), 0);
-
-  const entries: CategoryEntry[] = Object.entries(expenseMap)
+  return Object.entries(expenseMap)
     .filter(([, amount]) => amount > 0)
     .map(([name, amount]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1), // capitalise
+      name: name.charAt(0).toUpperCase() + name.slice(1),
       amount,
       percentage: total > 0 ? Math.round((amount / total) * 100) : 0,
       trend: "stable" as const,
     }))
-    .sort((a, b) => b.amount - a.amount); // highest first
-
-  return entries;
+    .sort((a, b) => b.amount - a.amount);
 }
 
-/**
- * Backend monthly entry uses `expense` key; chart expects `expenses`.
- * Also derive `savings` = income - expense.
- */
 function normaliseMonthlyData(raw: AIDashboardData["monthly"]): MonthlyEntry[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((entry) => ({
     month: entry.month,
     income: entry.income ?? 0,
-    expenses: entry.expense ?? 0, // key rename
+    expenses: entry.expense ?? 0,
     savings: (entry.income ?? 0) - (entry.expense ?? 0),
   }));
 }
 
-/**
- * Backend summary uses `total_expense`; UI expects `total_expenses`.
- * Derive savings_rate and health_score if missing.
- */
 function normaliseSummary(raw: AIDashboardData["summary"]): NormalisedSummary {
   const income = raw?.total_income ?? 0;
   const expense = raw?.total_expense ?? 0;
   const balance = raw?.balance ?? income - expense;
   const savingsRate = income > 0 ? (balance / income) * 100 : 0;
-
   return {
     total_income: income,
     total_expenses: expense,
@@ -101,554 +68,257 @@ function normaliseSummary(raw: AIDashboardData["summary"]): NormalisedSummary {
   };
 }
 
-/**
- * Backend confidence is a decimal 0–1 (e.g. 0.75).
- * Display as percentage 0–100.
- */
 function normaliseConfidence(confidence: number): number {
-  // If someone already sent 0–100 keep it; otherwise multiply
-  return confidence <= 1
-    ? Math.round(confidence * 100)
-    : Math.round(confidence);
+  return confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence);
 }
-
-// ─── Insight icon helper ──────────────────────────────────────────────────────
 
 function getInsightIcon(text: string) {
   const lower = text.toLowerCase();
-  if (
-    lower.includes("spend") ||
-    lower.includes("expense") ||
-    lower.includes("budget")
-  )
-    return (
-      <AlertTriangle className="h-4 w-4 text-warning flex-shrink-0 mt-0.5" />
-    );
-  if (
-    lower.includes("income") ||
-    lower.includes("salary") ||
-    lower.includes("earn")
-  )
-    return <TrendingUp className="h-4 w-4 text-success flex-shrink-0 mt-0.5" />;
-  if (lower.includes("save") || lower.includes("saving"))
-    return <Wallet className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />;
-  if (lower.includes("predict") || lower.includes("next month"))
-    return (
-      <Activity className="h-4 w-4 text-violet-500 flex-shrink-0 mt-0.5" />
-    );
-  return <Lightbulb className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />;
+  if (lower.includes("spend") || lower.includes("expense") || lower.includes("budget")) return <AlertTriangle className="h-4 w-4 text-warning mt-0.5" />;
+  if (lower.includes("income") || lower.includes("salary")) return <TrendingUp className="h-4 w-4 text-success mt-0.5" />;
+  if (lower.includes("save") || lower.includes("saving")) return <Wallet className="h-4 w-4 text-primary mt-0.5" />;
+  if (lower.includes("predict")) return <Activity className="h-4 w-4 text-violet-500 mt-0.5" />;
+  return <Lightbulb className="h-4 w-4 text-primary mt-0.5" />;
 }
-
-function getInsightStyle(text: string): string {
-  const lower = text.toLowerCase();
-  if (
-    lower.includes("over budget") ||
-    lower.includes("went up") ||
-    lower.includes("high") ||
-    lower.includes("🚨")
-  )
-    return "border-destructive/30 bg-destructive/5";
-  if (
-    lower.includes("watch") ||
-    lower.includes("almost") ||
-    lower.includes("⚠️") ||
-    lower.includes("📈")
-  )
-    return "border-warning/30 bg-warning/5";
-  if (
-    lower.includes("awesome") ||
-    lower.includes("great") ||
-    lower.includes("down") ||
-    lower.includes("🎉") ||
-    lower.includes("✅")
-  )
-    return "border-success/30 bg-success/5";
-  return "border-border bg-muted/30";
-}
-
-// ─── Skeleton loader ──────────────────────────────────────────────────────────
-
-function SkeletonCard() {
-  return (
-    <Card className="glass-card p-6">
-      <div className="animate-pulse space-y-3">
-        <div className="h-3 bg-muted rounded w-3/4" />
-        <div className="h-7 bg-muted rounded w-1/2" />
-      </div>
-    </Card>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [dashboardData, setDashboardData] = useState<AIDashboardData | null>(
-    null,
-  );
-  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<AIDashboardData | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Zustand fetches for UI widgets
+  const { budgets, goals, fetchBudgets, fetchGoals } = useFinanceStore();
 
   const loadDashboardData = async () => {
     try {
-      setIsLoading(true);
+      setDashboardLoading(true);
       setError(null);
-
-      const data: AIDashboardData = await apiClient.getAIDashboard();
-
-      console.log("✅ Dashboard raw data:", data);
-      console.log("  insights:", data.insights);
-      console.log("  categories:", data.categories);
-      console.log("  predicted_next_spending:", data.predicted_next_spending);
-      console.log("  monthly:", data.monthly);
-
+      const data = await apiClient.getAIDashboard();
       setDashboardData(data);
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.message ||
-        err.message ||
-        "Failed to load dashboard";
-      setError(msg);
-      toast({
-        title: "Dashboard Error",
-        description: msg,
-        variant: "destructive",
-      });
+      setError(err?.message || "Failed to load dashboard");
+      toast({ title: "Dashboard Error", description: err?.message, variant: "destructive" });
     } finally {
-      setIsLoading(false);
+      setDashboardLoading(false);
     }
   };
 
   useEffect(() => {
     loadDashboardData();
+    fetchBudgets();
+    fetchGoals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Loading state ──────────────────────────────────────────────────────────
-  if (isLoading) {
+  if (dashboardLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-display font-bold">
-            Financial Dashboard
-          </h1>
-          <Button variant="outline" size="sm" disabled>
-            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-            Loading…
-          </Button>
-        </div>
-
-        {/* Summary skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
-        </div>
-
-        {/* Body skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="glass-card p-6 h-64 animate-pulse">
-            <div className="h-full bg-muted rounded" />
-          </Card>
-          <Card className="glass-card p-6 h-64 animate-pulse">
-            <div className="h-full bg-muted rounded" />
-          </Card>
-        </div>
+        <div className="flex justify-between items-center"><h1 className="text-2xl font-bold">Dashboard</h1><RefreshCw className="h-5 w-5 animate-spin" /></div>
+        <div className="grid grid-cols-4 gap-4"><Card className="h-24 animate-pulse bg-muted" /><Card className="h-24 animate-pulse bg-muted" /><Card className="h-24 animate-pulse bg-muted" /><Card className="h-24 animate-pulse bg-muted" /></div>
       </div>
     );
   }
 
-  // ── Error state ────────────────────────────────────────────────────────────
   if (error || !dashboardData) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-display font-bold">
-            Financial Dashboard
-          </h1>
-          <Button variant="outline" size="sm" onClick={loadDashboardData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </div>
-        <Card className="glass-card p-8 text-center">
-          <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">
-            Unable to load dashboard
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            {error ?? "No data available"}
-          </p>
-          <Button onClick={loadDashboardData}>Try Again</Button>
-        </Card>
+      <div className="text-center py-20">
+        <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-4" />
+        <p className="text-lg">{error ?? "Dashboard failed to load"}</p>
+        <Button onClick={loadDashboardData} className="mt-4">Retry</Button>
       </div>
     );
   }
 
-  // ── Normalise raw API response ─────────────────────────────────────────────
   const summary = normaliseSummary(dashboardData.summary);
   const categoryEntries = normaliseCategoryData(dashboardData.categories);
   const monthlyEntries = normaliseMonthlyData(dashboardData.monthly);
+  const insights: string[] = Array.isArray(dashboardData.insights) ? dashboardData.insights : [];
+  const recentTransactions = Array.isArray(dashboardData.recent_transactions) ? dashboardData.recent_transactions : [];
   const prediction = dashboardData.predicted_next_spending ?? null;
-  const insights: string[] = Array.isArray(dashboardData.insights)
-    ? dashboardData.insights
-    : [];
-  const recentTransactions = Array.isArray(dashboardData.recent_transactions)
-    ? dashboardData.recent_transactions
-    : [];
-  const flaggedTransactions = Array.isArray(
-    dashboardData.ai_flagged_transactions,
-  )
-    ? dashboardData.ai_flagged_transactions
-    : [];
+  const flaggedTransactions = (Array.isArray(dashboardData.ai_flagged_transactions) ? dashboardData.ai_flagged_transactions : [])
+        .filter((t: any) => t.type !== 'income' && t.type !== 'credit');
 
-  const confidencePct = prediction
-    ? normaliseConfidence(prediction.confidence)
-    : 0;
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
+    <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold">
-            Financial Dashboard
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            AI-powered insights &amp; analytics
-          </p>
+          <h1 className="text-3xl font-display font-bold">Overview</h1>
+          <p className="text-sm text-muted-foreground mt-1">Your automated financial intelligence report</p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadDashboardData}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <Button variant="outline" size="sm" onClick={loadDashboardData}><RefreshCw className="h-4 w-4 mr-2" /> Refresh</Button>
       </div>
 
-      {/* ── Anomaly alerts (full-width, at top) ── */}
-      {flaggedTransactions.length > 0 && (
-        <AnomalyAlerts flaggedTransactions={flaggedTransactions} />
-      )}
+      {flaggedTransactions.length > 0 && <AnomalyAlerts flaggedTransactions={flaggedTransactions} />}
 
-      {/* ── Summary cards ── */}
+      {/* Primary KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="glass-card p-6">
-            <div className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="glass-card p-5 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden">
+            <div className="flex justify-between items-center z-10 relative">
               <div>
-                <p className="text-sm text-muted-foreground">Total Income</p>
-                <p className="text-2xl font-bold text-success">
-                  ₹{safeToLocaleString(summary.total_income)}
-                </p>
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Net Balance</p>
+                <p className="text-3xl font-bold mt-1 tracking-tight text-primary">₹{safeToLocaleString(summary.balance)}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-success/10 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-success" />
-              </div>
+              <div className="p-3 bg-primary/10 rounded-xl"><DollarSign className="h-6 w-6 text-primary" /></div>
             </div>
           </Card>
         </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="glass-card p-6">
-            <div className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className="glass-card p-5">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm text-muted-foreground">Total Expenses</p>
-                <p className="text-2xl font-bold text-destructive">
-                  ₹{safeToLocaleString(summary.total_expenses)}
-                </p>
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Total Income</p>
+                <p className="text-2xl font-bold mt-1 text-success">₹{safeToLocaleString(summary.total_income)}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-                <TrendingDown className="h-6 w-6 text-destructive" />
-              </div>
+              <div className="p-3 bg-success/10 rounded-xl"><TrendingUp className="h-5 w-5 text-success" /></div>
             </div>
           </Card>
         </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="glass-card p-6">
-            <div className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <Card className="glass-card p-5">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm text-muted-foreground">Balance</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    summary.balance >= 0 ? "text-success" : "text-destructive"
-                  }`}
-                >
-                  ₹{safeToLocaleString(summary.balance)}
-                </p>
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Total Expenses</p>
+                <p className="text-2xl font-bold mt-1 text-destructive">₹{safeToLocaleString(summary.total_expenses)}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <DollarSign className="h-6 w-6 text-primary" />
-              </div>
+              <div className="p-3 bg-destructive/10 rounded-xl"><TrendingDown className="h-5 w-5 text-destructive" /></div>
             </div>
           </Card>
         </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="glass-card p-6">
-            <div className="flex items-center justify-between">
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+          <Card className="glass-card p-5">
+            <div className="flex justify-between items-center">
               <div>
-                <p className="text-sm text-muted-foreground">Savings Rate</p>
-                <p className="text-2xl font-bold">
-                  {safeToFixed(summary.savings_rate)}%
-                </p>
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Savings Rate</p>
+                <p className="text-2xl font-bold mt-1">{summary.savings_rate.toFixed(1)}%</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-warning/10 flex items-center justify-center">
-                <Target className="h-6 w-6 text-warning" />
-              </div>
+              <div className="p-3 bg-warning/10 rounded-xl"><Target className="h-5 w-5 text-warning" /></div>
             </div>
           </Card>
         </motion.div>
       </div>
 
-      {/* ── Category chart + AI Insights ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Category Donut Chart */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Spending by Category
-            </h3>
-
-            {categoryEntries.length > 0 ? (
-              <CategoryDonutChart data={categoryEntries} />
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <BarChart3 className="h-10 w-10 text-muted-foreground mb-3 opacity-40" />
-                <p className="text-sm text-muted-foreground">
-                  No expense categories found. Add some transactions to see
-                  spending breakdown.
-                </p>
-              </div>
-            )}
-          </Card>
-        </motion.div>
-
-        {/* AI Insights */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Brain className="h-5 w-5 text-primary" />
-              AI Insights
-              {insights.length > 0 && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full ml-1">
-                  {insights.length}
-                </span>
-              )}
-            </h3>
-
-            {insights.length > 0 ? (
-              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-                {insights.map((insight, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 * index }}
-                    className={`flex items-start gap-3 p-3 rounded-lg border ${getInsightStyle(
-                      insight,
-                    )}`}
-                  >
-                    {getInsightIcon(insight)}
-                    <p className="text-sm leading-relaxed">{insight}</p>
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Brain className="h-10 w-10 text-muted-foreground mb-3 opacity-40" />
-                <p className="text-sm text-muted-foreground">
-                  No AI insights available yet. Add more transactions so our AI
-                  can start analysing your spending patterns.
-                </p>
-              </div>
-            )}
-          </Card>
-        </motion.div>
-      </div>
-
-      {/* ── Predicted Spending ── */}
-      {prediction && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-5 flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              AI Prediction — Next Month
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Amount */}
-              <div className="text-center p-4 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20">
-                <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">
-                  Predicted Spending
-                </p>
-                <p className="text-3xl font-bold text-primary">
-                  {formatCurrency(prediction.amount)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {prediction.date && prediction.date !== "next month"
-                    ? (() => {
-                        try {
-                          return new Date(prediction.date).toLocaleDateString(
-                            "en-IN",
-                            { month: "long", year: "numeric" },
-                          );
-                        } catch {
-                          return prediction.date;
-                        }
-                      })()
-                    : "Next Month"}
-                </p>
-              </div>
-
-              {/* Confidence bar */}
-              <div className="flex flex-col justify-center p-4 rounded-xl bg-muted/30 border border-border">
-                <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">
-                  Confidence
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${
-                        confidencePct >= 80
-                          ? "bg-success"
-                          : confidencePct >= 60
-                            ? "bg-warning"
-                            : "bg-destructive"
-                      }`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${confidencePct}%` }}
-                      transition={{ duration: 0.8, delay: 0.9 }}
-                    />
-                  </div>
-                  <span
-                    className={`text-sm font-bold ${
-                      confidencePct >= 80
-                        ? "text-success"
-                        : confidencePct >= 60
-                          ? "text-warning"
-                          : "text-destructive"
-                    }`}
-                  >
-                    {confidencePct}%
-                  </span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Main Charts (2/3 width) */}
+        <div className="lg:col-span-2 space-y-6">
+          <motion.div initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
+            <Card className="glass-card p-6">
+              <h3 className="text-lg font-display font-semibold mb-6 flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" /> Monthly Cashflow
+              </h3>
+              <IncomeExpenseChart data={monthlyEntries} />
+            </Card>
+          </motion.div>
+          <motion.div initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
+            <Card className="glass-card p-6">
+              <h3 className="text-lg font-display font-semibold mb-6 flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" /> Spending by Category
+              </h3>
+              <CategoryBarChart data={categoryEntries} />
+              
+              {/* Spending Insights Banner embedded inside the chart card */}
+              {categoryEntries.length > 0 && (
+                <div className="mt-4 p-4 rounded-xl bg-muted/40 border flex items-start gap-3">
+                   <Lightbulb className="h-5 w-5 text-warning mt-0.5" />
+                   <div>
+                     <p className="text-sm font-semibold">Spending Highlight</p>
+                     <p className="text-xs text-muted-foreground mt-1">
+                       Your top expense this month is <strong className="text-foreground">{categoryEntries[0].name}</strong>, accounting for <strong className="text-foreground">{categoryEntries[0].percentage}%</strong> of your total categorized spending.
+                     </p>
+                   </div>
                 </div>
-                <Badge
-                  className="mt-2 w-fit"
-                  variant={
-                    confidencePct >= 80
-                      ? "default"
-                      : confidencePct >= 60
-                        ? "secondary"
-                        : "destructive"
-                  }
-                >
-                  {confidencePct >= 80
-                    ? "High confidence"
-                    : confidencePct >= 60
-                      ? "Medium confidence"
-                      : "Low confidence"}
-                </Badge>
-              </div>
+              )}
+            </Card>
+          </motion.div>
+        </div>
 
-              {/* Context */}
-              <div className="flex flex-col justify-center p-4 rounded-xl bg-muted/20 border border-border">
-                <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">
-                  vs. This Month
-                </p>
-                {summary.total_expenses > 0 ? (
-                  (() => {
-                    const diff = prediction.amount - summary.total_expenses;
-                    const pct = Math.abs(
-                      (diff / summary.total_expenses) * 100,
-                    ).toFixed(1);
-                    const isMore = diff > 0;
+        {/* Right Column - Trackers & Insights (1/3 width) */}
+        <div className="space-y-6">
+          
+          <motion.div initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
+            <Card className="glass-card p-6">
+              <h3 className="text-lg font-display font-semibold mb-4 flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" /> Goal Progress
+              </h3>
+              {goals.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No active goals found.</p>
+              ) : (
+                <div className="space-y-4">
+                  {goals.slice(0,3).map(g => {
+                    const pct = Math.min(100, Math.round((g.currentAmount / g.targetAmount) * 100));
                     return (
-                      <>
-                        <p
-                          className={`text-2xl font-bold ${
-                            isMore ? "text-destructive" : "text-success"
-                          }`}
-                        >
-                          {isMore ? "+" : "-"}₹
-                          {safeToLocaleString(Math.abs(diff))}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {isMore ? "▲" : "▼"} {pct}%{" "}
-                          {isMore ? "more than" : "less than"} current month
-                        </p>
-                      </>
-                    );
-                  })()
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No current-month data to compare.
-                  </p>
-                )}
-              </div>
-            </div>
+                      <div key={g.id}>
+                        <div className="flex justify-between items-end mb-1">
+                          <span className="text-sm font-medium flex items-center gap-2">{g.icon} {g.title}</span>
+                          <span className="text-xs text-muted-foreground">{pct}%</span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div className={`h-full ${pct >= 100 ? 'bg-success' : 'bg-primary'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+          </motion.div>
 
-            <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
-              🤖 This prediction is generated by our ML model based on your
-              historical spending patterns. Actual amounts may vary.
-            </p>
-          </Card>
-        </motion.div>
-      )}
+          <motion.div initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 }}>
+            <Card className="glass-card p-6">
+              <h3 className="text-lg font-display font-semibold mb-4 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" /> Budget Usage
+              </h3>
+              {budgets.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">No active budgets found.</p>
+              ) : (
+                <div className="space-y-4">
+                  {budgets.slice(0,3).map(b => {
+                    const pct = Math.min(100, Math.round((b.spentAmount / b.budgetAmount) * 100));
+                    const isOver = pct >= 90;
+                    return (
+                      <div key={b.id}>
+                        <div className="flex justify-between items-end mb-1">
+                          <span className="text-sm font-medium flex items-center gap-2">{b.icon} {b.category}</span>
+                          <span className="text-xs text-muted-foreground">₹{safeToLocaleString(b.spentAmount)} / {safeToLocaleString(b.budgetAmount)}</span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div className={`h-full ${isOver ? 'bg-destructive' : 'bg-success'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
+          </motion.div>
 
-      {/* ── Income vs Expense trend chart ── */}
-      {monthlyEntries.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-        >
-          <Card className="glass-card p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Monthly Income vs Expenses
-            </h3>
-            <IncomeExpenseChart data={monthlyEntries} />
-          </Card>
-        </motion.div>
-      )}
+          {/* AI Insights specific card overlay */}
+          <motion.div initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.9 }}>
+            <Card className="glass-card p-6 bg-gradient-to-br from-primary/5 to-transparent border-primary/10">
+              <h3 className="text-lg font-display font-semibold mb-4 flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" /> AI Insights
+              </h3>
+              {insights.length > 0 ? (
+                <div className="space-y-3">
+                  {insights.slice(0,4).map((insight, idx) => (
+                    <div key={idx} className="flex gap-3 text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                      {getInsightIcon(insight)}
+                      <span className="text-muted-foreground leading-relaxed">{insight}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground text-center py-4">More transactions needed for AI to generate intelligent recommendations.</p>
+              )}
+            </Card>
+          </motion.div>
 
-      {/* ── Recent Transactions ── */}
+        </div>
+      </div>
+
       {recentTransactions.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.0 }}>
           <RecentTransactions transactions={recentTransactions} />
         </motion.div>
       )}
