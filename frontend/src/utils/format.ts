@@ -57,7 +57,7 @@ export function formatDate(date: string | Date, format: 'short' | 'long' | 'rela
         month: 'long',
         day: 'numeric',
       });
-    case 'relative':
+    case 'relative': {
       const now = new Date();
       const diffInDays = Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24));
       
@@ -67,6 +67,7 @@ export function formatDate(date: string | Date, format: 'short' | 'long' | 'rela
       if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} weeks ago`;
       if (diffInDays < 365) return `${Math.floor(diffInDays / 30)} months ago`;
       return `${Math.floor(diffInDays / 365)} years ago`;
+    }
     default:
       return dateObj.toLocaleDateString();
   }

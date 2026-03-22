@@ -242,8 +242,8 @@ const WELCOME: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hi! 👋 I'm your AI Financial Advisor, powered by FinanceAI's ML engine.\n\n" +
-    "I connect directly to your real transaction data to give personalised insights on spending, savings, budgeting, and investments.\n\n" +
+    "Hi! 👋 Welcome to Financial Insights.\n\n" +
+    "I connect directly to your real transaction data to give personalised recommendations on spending, savings, budgeting, and investments.\n\n" +
     "Pick a quick question below or type your own — I'm here to help!",
   timestamp: new Date(),
 };
@@ -411,10 +411,10 @@ export default function AdvisorPage() {
           </div>
           <div>
             <h1 className="text-xl font-display font-bold leading-tight">
-              AI Financial Advisor
+              Financial Insights
             </h1>
             <p className="text-xs text-muted-foreground">
-              Powered by FinanceAI ML Engine · Real data · Personalised insights
+              Smart analysis · Real data · Personalised recommendations
             </p>
           </div>
         </div>
@@ -449,7 +449,7 @@ export default function AdvisorPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white">
-                AI Financial Advisor
+                Financial Insights
               </p>
               <p className="text-[11px] text-slate-400">
                 Chatting as {displayName}
@@ -601,8 +601,8 @@ export default function AdvisorPage() {
                 { icon: "📊", tip: "Ask about specific spending categories" },
                 { icon: "📅", tip: "Request monthly or weekly comparisons" },
                 { icon: "🎯", tip: "Ask for a personalised savings plan" },
-                { icon: "💡", tip: "AI uses your real transaction data" },
-                { icon: "🤖", tip: "Powered by LSTM + LLM ML engine" },
+                { icon: "💡", tip: "Insights use your real transaction data" },
+                { icon: "🔒", tip: "Bank-level secure and private" },
               ].map(({ icon, tip }, i) => (
                 <li
                   key={i}

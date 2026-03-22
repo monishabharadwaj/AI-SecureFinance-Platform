@@ -33,7 +33,7 @@ const mainItems = [
 ];
 
 const insightItems = [
-  { title: "AI Advisor", url: "/advisor", icon: Bot },
+  { title: "Financial Insights", url: "/advisor", icon: Bot },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
 ];
 

@@ -109,11 +109,27 @@ const getMe = async (req, res, next) => {
   }
 };
 
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name, phone } = req.body;
+    const userId = req.user.id;
+    
+    await userModel.updateProfile(userId, name, phone);
+    
+    const updatedUser = await userModel.findById(userId);
+    const { password: _, ...userWithoutPassword } = updatedUser;
+    res.json(userWithoutPassword);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   register,
   login,
   refreshToken,
   forgotPassword,
   resetPassword,
-  getMe
+  getMe,
+  updateProfile
 };

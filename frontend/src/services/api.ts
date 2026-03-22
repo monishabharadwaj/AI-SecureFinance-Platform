@@ -174,6 +174,11 @@ class ApiClient {
     }
   }
 
+  async updateProfile(name: string, phone: string) {
+    const response = await this.api.put("/auth/profile", { name, phone });
+    return response.data;
+  }
+
   // Auth endpoints
   // ── Auth ───────────────────────────────────────────────────────────────────
 

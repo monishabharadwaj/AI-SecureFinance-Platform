@@ -13,6 +13,7 @@ import GoalsPage from "./pages/GoalsPage";
 import TripsPage from "./pages/TripsPage";
 import AdvisorPage from "./pages/AdvisorPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import ProfilePage from "./pages/ProfilePage";
 
 import UploadPage from "./pages/UploadPage";
 import LoginPage from "./pages/LoginPage";
@@ -136,6 +137,14 @@ const App = () => (
                 element={
                   <ProtectedPage>
                     <AdvisorPage />
+                  </ProtectedPage>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedPage>
+                    <ProfilePage />
                   </ProtectedPage>
                 }
               />

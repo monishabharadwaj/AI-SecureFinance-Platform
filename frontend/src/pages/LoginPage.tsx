@@ -54,15 +54,15 @@ export default function LoginPage() {
                <div className="absolute inset-0 bg-white/20 w-full h-full pointer-events-none" style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%, 0 100%)' }} />
                <BrainCircuit className="h-8 w-8 text-white relative z-10" />
             </div>
-            <h1 className="text-3xl font-display font-bold tracking-tight">AI Secure Finance</h1>
+            <h1 className="text-3xl font-display font-bold tracking-tight">Smart Finance Manager</h1>
           </div>
           
           <div className="space-y-4">
             <h2 className="text-5xl font-display font-bold leading-tight">
-              Track, analyze, and predict your finances with <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-400">AI</span>.
+              Track your income, manage expenses, and stay in control of your finances.
             </h2>
             <p className="text-lg text-zinc-400 max-w-md">
-              Harness machine learning algorithms to audit transactions, predict end-of-month balances, and automatically capture anomalous deductions.
+              All your financial data in one place — simple and easy to understand.
             </p>
           </div>
 
@@ -71,13 +71,13 @@ export default function LoginPage() {
               <div className="p-3 rounded-full bg-white/5 border border-white/10 text-primary">
                 <ShieldCheck className="h-6 w-6" />
               </div>
-              <p className="text-sm font-medium text-zinc-300">Bank-level Security</p>
+              <p className="text-sm font-medium text-zinc-300">Secure Architecture</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-full bg-white/5 border border-white/10 text-primary">
                 <Activity className="h-6 w-6" />
               </div>
-              <p className="text-sm font-medium text-zinc-300">Real-time Analytics</p>
+              <p className="text-sm font-medium text-zinc-300">Intelligent Insights</p>
             </div>
           </div>
         </motion.div>
@@ -93,8 +93,8 @@ export default function LoginPage() {
               <BrainCircuit className="h-7 w-7 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-display font-bold">AI Secure Finance</h1>
-              <p className="text-xs text-muted-foreground">Smart Money Manager</p>
+              <h1 className="text-2xl font-display font-bold">Smart Finance</h1>
+              <p className="text-xs text-muted-foreground">Manager</p>
             </div>
           </div>
 

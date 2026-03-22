@@ -14,6 +14,7 @@ interface AuthStore {
   clearError: () => void;
   checkAuth: () => void;
   fetchMe: () => Promise<void>;
+  updateProfile: (name: string, phone: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -95,6 +96,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
     } catch {
       // /api/auth/me may not exist — silently fall back to JWT-decoded data
+    }
+  },
+
+  updateProfile: async (name: string, phone: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedUser = await apiClient.updateProfile(name, phone);
+      set((s) => ({ user: { ...s.user, ...updatedUser } as User, isLoading: false }));
+    } catch (e: any) {
+      set({ error: e.message, isLoading: false });
+      throw e;
     }
   },
 }));

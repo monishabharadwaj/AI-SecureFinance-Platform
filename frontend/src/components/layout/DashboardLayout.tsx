@@ -14,6 +14,7 @@ import {
   X,
   ChevronDown,
   Upload,
+  Settings,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ const NAV_ITEMS = [
   { path: "/goals", label: "Goals", icon: Target },
   { path: "/trips", label: "Trips", icon: Plane },
   { path: "/analytics", label: "Analytics", icon: BarChart3 },
-  { path: "/advisor", label: "AI Advisor", icon: Bot },
+  { path: "/advisor", label: "Financial Insights", icon: Bot },
   { path: "/upload", label: "Upload Docs", icon: Upload },
 ];
 
@@ -61,8 +62,43 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     navigate("/login", { replace: true });
   };
 
+  const displayPhone = (user as any)?.phone || null;
   const displayName = user?.name ?? "User";
   const displayEmail = user?.email ?? "";
+
+  const DropdownContents = () => (
+    <>
+      <div className="px-3 py-2">
+        <p className="text-sm font-semibold truncate leading-none mb-1">{displayName}</p>
+        <p className="text-xs text-muted-foreground truncate">{displayEmail}</p>
+        
+        {displayPhone ? (
+          <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5 font-medium">
+            <span className="text-[10px] bg-primary/10 text-primary px-1.5 rounded uppercase font-bold tracking-wider">Phone</span>
+            {displayPhone}
+          </p>
+        ) : (
+          <Link to="/profile" className="text-[11px] text-blue-500 hover:text-blue-400 mt-2 inline-block font-medium">
+            + hover to Add phone number
+          </Link>
+        )}
+      </div>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild className="cursor-pointer">
+        <Link to="/profile" className="w-full flex items-center">
+          <Settings className="h-4 w-4 mr-2" />
+          Settings & Profile
+        </Link>
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={handleLogout}
+        className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+      >
+        <LogOut className="h-4 w-4 mr-2" />
+        Sign Out
+      </DropdownMenuItem>
+    </>
+  );
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -73,9 +109,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
         <div>
           <p className="font-bold text-white text-sm leading-tight">
-            FinanceAI
+            Smart Finance
           </p>
-          <p className="text-[10px] text-slate-400">Smart Money Manager</p>
+          <p className="text-[10px] text-slate-400">Money Manager</p>
         </div>
       </div>
 
@@ -106,7 +142,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <div className="px-3 py-4 border-t border-white/10">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-left">
+            <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/10 transition-colors text-left hidden lg:flex">
               <UserAvatar name={displayName} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-white truncate">
@@ -119,21 +155,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <ChevronDown className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-52 mb-1">
-            <div className="px-2 py-1.5">
-              <p className="text-sm font-semibold truncate">{displayName}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {displayEmail}
-              </p>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleLogout}
-              className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </DropdownMenuItem>
+          <DropdownMenuContent side="top" align="start" className="w-56 mb-1">
+            <DropdownContents />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -198,16 +221,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {/* Page title — derived from current path */}
           <p className="font-semibold text-sm hidden sm:block">
             {NAV_ITEMS.find((n) => n.path === location.pathname)?.label ??
-              "FinanceAI"}
+              "Smart Finance"}
           </p>
 
           <div className="flex items-center gap-3 ml-auto">
             {/* Desktop user info */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="hidden lg:flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors">
+                <button className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-muted transition-colors">
                   <UserAvatar name={displayName} />
-                  <div className="text-left">
+                  <div className="text-left hidden lg:block">
                     <p className="text-xs font-semibold leading-tight">
                       {displayName}
                     </p>
@@ -215,26 +238,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       {displayEmail}
                     </p>
                   </div>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  <ChevronDown className="h-3 w-3 text-muted-foreground hidden lg:block" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <div className="px-2 py-1.5">
-                  <p className="text-sm font-semibold truncate">
-                    {displayName}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {displayEmail}
-                  </p>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-56 mt-2">
+                <DropdownContents />
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
