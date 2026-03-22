@@ -166,39 +166,107 @@ class FinancialAIEngine:
     # Master Insight Generator
     # ------------------------------
     def generate_full_financial_report(self, transactions):
+        income_total = sum(t["amount"] for t in transactions if t.get("type", "expense").lower() in ["income", "credit"])
+        expense_total = sum(t["amount"] for t in transactions if t.get("type", "expense").lower() in ["expense", "debit"])
+        
+        cats = defaultdict(float)
+        for t in transactions:
+            if t.get("type", "expense").lower() in ["expense", "debit"]:
+                cats[t.get("category", "other")] += t["amount"]
+                
+        sorted_cats = sorted(cats.items(), key=lambda x: x[1], reverse=True)
+        top_cat = f"{sorted_cats[0][0]} (₹{sorted_cats[0][1]:.0f})" if sorted_cats else "None"
+        
+        amounts = [t["amount"] for t in transactions if t.get("type", "expense").lower() in ["expense", "debit"]]
+        avg = statistics.mean(amounts) if amounts else 0
+        unusual = [a for a in amounts if a > avg * 3]
+        unusual_str = f"Found {len(unusual)} unusually large transaction(s) > ₹{avg*3:.0f}" if unusual else "None"
 
-        insights = []
+        summary = f"**Summary**\n• Total Transactions: {len(transactions)}\n• Total Income: ₹{income_total:.0f}\n• Total Expenses: ₹{expense_total:.0f}"
+        key_insights = f"**Key Insights**\n• Top Spending Category: {top_cat}\n• Unusual Transactions: {unusual_str}"
+        
+        recs = []
+        if expense_total > income_total:
+            recs.append("• 🚨 Reduce discretionary spending to stop cash bleed.")
+        else:
+            recs.append("• 📈 Great job keeping expenses under income! Consider routing surplus to an emergency fund.")
+            
+        if unusual:
+            recs.append("• ⚠️ Review your unusually large purchases to see if they were strictly necessary.")
+            
+        if sorted_cats and sorted_cats[0][1] > expense_total * 0.4:
+            recs.append(f"• ✂️ Try to cut back on {sorted_cats[0][0]}, which makes up more than 40% of your expenses.")
+            
+        if not recs:
+            recs.append("• Maintain your current healthy financial habits.")
 
-        insights.extend(self.analyze_spending_behavior(transactions))
-        insights.extend(self.analyze_categories(transactions))
-        insights.extend(self.analyze_spending_trends(transactions))
-        insights.extend(self.generate_advice(transactions))
+        recommendations = "**Recommendations**\n" + "\n".join(recs)
 
-        return insights
+        return [summary, key_insights, recommendations]
 
 
     # ------------------------------
     # Chatbot Response Engine
     # ------------------------------
     def answer_question(self, question, transactions):
+        question_lower = question.lower()
+        
+        income_total = sum(t["amount"] for t in transactions if t.get("type", "").lower() in ["income", "credit"])
+        expense_total = sum(t["amount"] for t in transactions if t.get("type", "expense").lower() in ["expense", "debit"])
+        savings = income_total - expense_total
+        
+        cats = defaultdict(float)
+        for t in transactions:
+            if t.get("type", "expense").lower() in ["expense", "debit"]:
+                cats[t.get("category", "other").lower()] += t["amount"]
+                
+        # 1. Category specific queries
+        for cat in cats.keys():
+            if cat in question_lower and (any(w in question_lower for w in ["spend", "much", "cost", "pay"])):
+                amt = cats[cat]
+                pct = (amt / expense_total * 100) if expense_total > 0 else 0
+                return f"You have spent **₹{amt:.0f}** on **{cat.title()}**, which is about **{pct:.1f}%** of your total expenses. {'This is quite high!' if pct > 30 else 'This seems reasonable.'}"
 
-        question = question.lower()
-
-        if "spending the most" in question or "where do i spend" in question:
-            return self.analyze_categories(transactions)[0]
-
-        if "average" in question:
-            avg = statistics.mean([t["amount"] for t in transactions])
-            return f"Your average spending per transaction is around ₹{avg:.0f}."
-
-        if "trend" in question:
+        # 2. General reduction
+        if any(w in question_lower for w in ["reduce", "cut", "lower", "decrease", "save more"]):
+            top_cat = sorted(cats.items(), key=lambda x: x[1], reverse=True)[0] if cats else None
+            if not top_cat: return "I don't see any expenses to reduce yet."
+            return f"To reduce your expenses, start with your largest category: **{top_cat[0].title()}** (₹{top_cat[1]:.0f}). Try setting a strict budget for it or finding cheaper alternatives. Review your recurring subscriptions!"
+            
+        # 3. Largest expense / biggest
+        if any(w in question_lower for w in ["largest", "biggest", "highest", "most", "top"]):
+            if not cats: return "You haven't recorded any expenses yet."
+            top_cat = sorted(cats.items(), key=lambda x: x[1], reverse=True)[0]
+            expense_txs = [t for t in transactions if t.get("type", "expense").lower() in ["expense", "debit"]]
+            max_tx = max(expense_txs, key=lambda x: x["amount"], default=None)
+            res = f"Your highest spending category is **{top_cat[0].title()}** at ₹{top_cat[1]:.0f}.\n\n"
+            if max_tx:
+                res += f"Your single largest transaction was **{max_tx['description']}** for ₹{max_tx['amount']:.0f}."
+            return res
+            
+        # 4. Savings status
+        if any(w in question_lower for w in ["saving", "save", "enough", "good", "bad"]):
+            rate = (savings / income_total * 100) if income_total > 0 else 0
+            if rate > 20: return f"You are saving **₹{savings:.0f}** ({rate:.1f}% of income). That's excellent! Keep it up."
+            elif rate > 0: return f"You are saving **₹{savings:.0f}** ({rate:.1f}% of income). Consider aiming for the 20% rule by cutting down on {sorted(cats.items(), key=lambda x: x[1], reverse=True)[0][0].title() if cats else 'discretionary'} spending."
+            return f"You are currently spending more than you earn (Deficit: ₹{abs(savings):.0f})! Immediate budgeting is required."
+            
+        # 5. Original exact match fallbacks
+        if "spending analysis" in question_lower or "spending" in question_lower:
+            if not transactions: return "I need more data to analyze your spending."
+            top_cats = sorted(cats.items(), key=lambda x: x[1], reverse=True)[:3]
+            cat_str = ", ".join([f"{c[0].title()} (₹{c[1]:.0f})" for c in top_cats]) if top_cats else "None"
             trends = self.analyze_spending_trends(transactions)
-            if trends:
-                return trends[0]
-
-        if "advice" in question or "save money" in question:
-            advice = self.generate_advice(transactions)
-            if advice:
-                return advice[0]
-
-        return "I couldn't find a clear answer to that yet, but I'm still learning from your spending patterns."
+            trend_str = trends[0] if trends else 'Stable'
+            return f"**Spending Analysis:**\n- **Total Spent:** ₹{expense_total:.0f}\n- **Top Categories:** {cat_str}\n- **Trend:** {trend_str}"
+            
+        elif "investment advice" in question_lower or "invest" in question_lower:
+            if savings > 5000:
+                return f"**Investment Advice:**\nYou have a surplus of ₹{savings:.0f}. Consider diversifying:\n- **50%** into low-risk Index Funds/ETFs.\n- **30%** into Fixed Deposits or Bonds.\n- **20%** into Stocks depending on your risk appetite."
+            elif savings > 0:
+                return f"**Investment Advice:**\nYou have ₹{savings:.0f} available. Before heavy investing, build an **Emergency Fund** covering 3-6 months of expenses in a high-yield savings account."
+            else:
+                return "**Investment Advice:**\nCurrently, your expenses exceed your income. Focus on **debt reduction** and **budgeting** before looking into investments."
+                
+        # 6. Default Fallback Contextual Responder
+        return f"Based on your profile, you've earned ₹{income_total:.0f} and spent ₹{expense_total:.0f} this month. Is there a specific category or transaction you'd like me to analyze for you? (e.g. 'How much did I spend on food?' or 'What is my biggest expense?')"
